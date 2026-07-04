@@ -1,0 +1,167 @@
+{
+  "name": "github",
+  "type": "rest",
+  "display": {
+    "display_name": "GitHub",
+    "description": "GitHub REST API v3 — repositories, issues, and code search across github.com.",
+    "icon": "github",
+    "category": "developer",
+    "setup_help": "Create a fine-grained personal access token at https://github.com/settings/personal-access-tokens (or a classic PAT at https://github.com/settings/tokens). For the operations in this connection: public read endpoints need **no scopes at all** (a fine-grained token with Public Repositories read access, or a classic token with no scopes, is enough); `create-issue` on a repo you own needs the fine-grained **Issues: Read and write** repository permission (classic: `repo` scope, or `public_repo` for public repos only). Set the token as the env var `HTTP_AUTH_API_GITHUB_COM` for the http module. **A token is optional for the safe read operations** — unauthenticated calls work against public data at 60 requests/hour per IP; authenticated calls get 5,000/hour."
+  },
+  "env": "prod",
+  "account_label": "",
+  "data_categories": ["none"],
+  "base_url": "https://api.github.com",
+  "auth": {
+    "scheme": "bearer",
+    "secret": "github-pat",
+    "header": "Authorization",
+    "prefix": "Bearer "
+  },
+  "network_allowlist": ["api.github.com"],
+  "health": "get-rate-limit",
+  "timeout_ms": 30000,
+  "max_response_bytes": 262144,
+  "limits": { "per_minute": 30 },
+  "pagination": { "style": "page", "param": "page" },
+  "operations": [
+    {
+      "id": "get-rate-limit",
+      "summary": "Check remaining API rate-limit budget for the current token or IP",
+      "description": "Returns the rate-limit status for every resource bucket (core, search, etc.) with limit, used, remaining, and reset epoch. Use it as the connectivity probe and before burst work to see how much budget is left. Costs zero rate-limit budget itself. Returns a resources object plus a top-level rate summary.",
+      "method": "GET",
+      "path": "/rate_limit",
+      "params": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "safe": true,
+      "example_args": {}
+    },
+    {
+      "id": "get-repo",
+      "summary": "Fetch one repository's metadata by owner and name",
+      "description": "Returns the full metadata object for a single repository: description, default branch, stars, forks, open-issue count, language, license, visibility, and timestamps. Use when you already know the exact owner/repo pair; use search-repos when you only have keywords. Read-only. Returns one repository object.",
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}",
+      "params": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner — a user or organization login, e.g. 'anthropics'. Case-insensitive."
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name without the .git suffix, e.g. 'claude-code'."
+          }
+        },
+        "required": ["owner", "repo"]
+      },
+      "safe": true,
+      "example_args": { "owner": "anthropics", "repo": "claude-code" }
+    },
+    {
+      "id": "list-issues",
+      "summary": "List issues in a repository, filtered by state, newest first",
+      "description": "Returns a page of issues for a repository, most recently created first. Note GitHub's API counts pull requests as issues — PR items carry a pull_request key; filter them out when the user asks for issues only. Use get-repo first if you need the open-issue total. Read-only. Returns an array of issue objects.",
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/issues",
+      "params": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repository owner login, e.g. 'anthropics'."
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name, e.g. 'claude-code'."
+          },
+          "state": {
+            "type": "string",
+            "enum": ["open", "closed", "all"],
+            "default": "open",
+            "description": "Which issues to return by state. Defaults to open."
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 30,
+            "maximum": 100,
+            "description": "Results per page (max 100). Keep small — issue bodies are large and the response is byte-capped."
+          },
+          "page": {
+            "type": "integer",
+            "default": 1,
+            "description": "Page number of results to fetch, starting at 1."
+          }
+        },
+        "required": ["owner", "repo"]
+      },
+      "safe": true,
+      "example_args": { "owner": "anthropics", "repo": "claude-code", "state": "open", "per_page": 3, "page": 1 }
+    },
+    {
+      "id": "search-repos",
+      "summary": "Search public repositories by keywords and qualifiers",
+      "description": "Full-text search over public repositories, ranked by best match. The q value supports qualifiers like 'language:go', 'org:anthropics', 'stars:>100'. Use when you only have keywords; use get-repo when you know the exact owner/repo. Search has its own, tighter rate bucket (10/min unauthenticated). Returns total_count plus an items array of repository objects.",
+      "method": "GET",
+      "path": "/search/repositories",
+      "params": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Search keywords plus optional qualifiers, e.g. 'claude language:typescript org:anthropics'. Required."
+          },
+          "per_page": {
+            "type": "integer",
+            "default": 30,
+            "maximum": 100,
+            "description": "Results per page (max 100). Keep small for byte-capped responses."
+          },
+          "page": {
+            "type": "integer",
+            "default": 1,
+            "description": "Page number of results to fetch, starting at 1. Search returns at most 1000 results total."
+          }
+        },
+        "required": ["q"]
+      },
+      "safe": true,
+      "example_args": { "q": "claude-code org:anthropics", "per_page": 3, "page": 1 }
+    },
+    {
+      "id": "create-issue",
+      "summary": "Open a new issue in a repository (write — requires auth and intent)",
+      "description": "Creates a real issue in the target repository and notifies its watchers. Requires an authenticated token with issue write access; fails 404 on repos the token cannot write to. Issues can be closed afterwards but never deleted, so confirm explicit user intent before calling. Returns the created issue object including its number and html_url.",
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/issues",
+      "params": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Owner of the repository the issue is created in."
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository the issue is created in. The token must have issue write access here."
+          },
+          "title": {
+            "type": "string",
+            "description": "Issue title. Required. Keep it a short imperative summary."
+          },
+          "body": {
+            "type": "string",
+            "description": "Issue body in GitHub-flavored Markdown. Optional but strongly recommended."
+          }
+        },
+        "required": ["owner", "repo", "title"]
+      },
+      "safe": false,
+      "example_args": { "owner": "your-login", "repo": "your-repo", "title": "Example: connector smoke test", "body": "Opened via the github connection. Safe to close." }
+    }
+  ]
+}

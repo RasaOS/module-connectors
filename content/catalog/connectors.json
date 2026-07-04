@@ -1,0 +1,24 @@
+{
+  "_meta": {
+    "catalog_version": 1,
+    "updated": "2026-07-04",
+    "row_shape": "{element, services[], type: rest|mcp, auth_required, description} — per SA-031 §7",
+    "home": "Rung-1 staging: this index ships as Element data in rasa.module.connectors. It moves to registry-public/connectors.json when that repo initializes (Phase 8), and is served at GET /v1/connections/catalog under SA-031. One source of truth at a time — while it lives here, here wins."
+  },
+  "connectors": [
+    {
+      "element": "rasa.module.connectors",
+      "services": ["github"],
+      "type": "rest",
+      "auth_required": true,
+      "description": "GitHub REST API v3 — repos, issues, search. Bearer PAT by secret name (github-pat); unauthenticated public reads work at 60 req/hr."
+    },
+    {
+      "element": "rasa.module.connectors",
+      "services": ["open-meteo"],
+      "type": "rest",
+      "auth_required": false,
+      "description": "Open-Meteo weather — geocoding, forecasts, current conditions. No API key required for non-commercial use."
+    }
+  ]
+}

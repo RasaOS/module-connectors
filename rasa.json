@@ -1,0 +1,90 @@
+{
+  "$schema": "https://rasa-os.github.io/schema/rasa.schema.v1.json",
+  "contract_version": "1.3.0",
+  "name": "rasa.module.connectors",
+  "version": "0.1.0",
+  "kind": "module",
+  "aliases": [
+    "module-connectors"
+  ],
+  "description": "Reference connector pack — ready-made unified connection.json specs + per-API SKILL.md guides (GitHub, Open-Meteo) that install project-owned into .claude/connections/ and pair with rasa.module.http today. Every spec is live-tested and follows the locked SA-031 connection-spec shape exactly: these are the worked examples connector authors copy, and the first entries in the Connections catalog. Once the kernel Connections runtime (SA-031) lands, the same specs become typed conn__ tools with kernel-enforced allowlists.",
+  "source": {
+    "repo": "https://github.com/RasaOS/module-connectors",
+    "branch": "main"
+  },
+  "tier": "Pro",
+  "capabilities": [
+    "connections.reference-specs"
+  ],
+  "permissions": [
+    "network:fetch",
+    "fs:write"
+  ],
+  "requires": {
+    "parent_kind": [
+      "domain",
+      "orchestrator"
+    ]
+  },
+  "rasa": {
+    "role": "L1-mountable-capability",
+    "shape_pattern": "toolkit",
+    "note": "The first-party connector pack of the Connections track. Specs ship as SEEDS (skip-if-exists) because under contract 1.3.0 + rasa.module.http the consumer's .claude/connections/ copy IS their editable instance (allowlists, account labels, added ops belong to the project after install) — the definition≠instance philosophy at file grain. When the SA-031 kernel loader exists, connector Elements re-home specs to content/connections/ as Element-owned definitions with per-tenant instance records in the kernel; this pack will follow in that major rev. Pairing with rasa.module.http is a SOFT reference (specs are plain data; any SA-031-shaped consumer can read them). GitHub spec declares bearer auth by secret NAME only (github-pat); Open-Meteo is the no-auth worked example. Divergence from SA-031 §1 field names is drift — SA-031 wins."
+  },
+  "element": {
+    "description": "Element-owned files. The connection specs are deliberately NOT here — they seed into project ownership (see seed.files).",
+    "files": [
+      {
+        "from": "content/README.md",
+        "to": "content/README.md",
+        "policy": "opt-in",
+        "note": "Describes the pack, the seed-vs-content decision, and how to author a new connector from these examples. Fork/author-time doc; not installed into consumer projects."
+      },
+      {
+        "from": "content/catalog/connectors.json",
+        "to": "content/catalog/connectors.json",
+        "policy": "opt-in",
+        "note": "The rung-1 Connections catalog index (SA-031 §7 row shape: element/services/type/auth_required/description). Staged here as Element data until registry-public initializes (Phase 8); read by the future GET /v1/connections/catalog. Not installed into consumer projects."
+      }
+    ]
+  },
+  "seed": {
+    "description": "Project-owned connection specs copied at install only (skip-if-exists) — never overwritten on Element upgrade. Edit them freely after install; they are yours.",
+    "files": [
+      {
+        "from": "seed/connections/github/connection.json",
+        "to": ".claude/connections/github/connection.json",
+        "policy": "skip-if-exists",
+        "note": "GitHub REST v3 spec: bearer auth by NAME (github-pat; unauthenticated public reads work rate-limited), 4 curated safe ops (get-rate-limit health probe, get-repo, list-issues, search-repos) + create-issue (safe:false), page-style pagination. Live-tested unauthenticated through rasa.module.http's server."
+      },
+      {
+        "from": "seed/connections/github/SKILL.md",
+        "to": ".claude/connections/github/SKILL.md",
+        "policy": "skip-if-exists",
+        "note": "The 9-section per-API guide: auth modes + HTTP_AUTH_API_GITHUB_COM wiring, rate-limit etiquette (60/hr unauth vs 5000/hr), pagination idiom, X-GitHub-Api-Version pin guidance, write-op cautions, known-errors table."
+      },
+      {
+        "from": "seed/connections/open-meteo/connection.json",
+        "to": ".claude/connections/open-meteo/connection.json",
+        "policy": "skip-if-exists",
+        "note": "Open-Meteo spec — the NO-AUTH worked example (auth field omitted entirely). 3 safe ops (geocode health probe, forecast, current-weather) across two allowlisted hosts. Live-tested through rasa.module.http's server."
+      },
+      {
+        "from": "seed/connections/open-meteo/SKILL.md",
+        "to": ".claude/connections/open-meteo/SKILL.md",
+        "policy": "skip-if-exists",
+        "note": "The 9-section per-API guide: geocode→forecast recipe, variable-name gotchas (temperature_2m etc.), the two-host note, no-key/commercial-use terms."
+      },
+      {
+        "from": "seed/rasa.lock.json.template",
+        "to": ".claude/rasa.lock.json",
+        "policy": "init-only-with-sha",
+        "note": "Stamped with the Element HEAD commit SHA at init time. Lockfile shape per canon Spec §6 (Connection Contract). When co-installed under a parent that also stamps a lockfile, the parent's is authoritative (single-writer-per-path, Lock L-004). Substitutes the standard {{ELEMENT_*}} / {{TODAY}} placeholders via bin/init."
+      }
+    ]
+  },
+  "scaffold": {
+    "description": "Empty directories created at init by the declarative installer. None needed — the seeds carry the directory structure.",
+    "directories": []
+  }
+}

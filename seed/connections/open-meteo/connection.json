@@ -1,0 +1,143 @@
+{
+  "name": "open-meteo",
+  "type": "rest",
+  "display": {
+    "display_name": "Open-Meteo",
+    "description": "Free weather API: geocoding, hourly/daily forecasts, and current conditions worldwide. No credential required — this is the reference no-auth connection.",
+    "icon": "🌤️",
+    "category": "weather",
+    "setup_help": "**No credential is needed.** Open-Meteo is free for non-commercial use without an API key or account — this connection works out of the box; just ensure `api.open-meteo.com` and `geocoding-api.open-meteo.com` are in the http server's allowed hosts. For commercial use, an API-key plan exists: see <https://open-meteo.com/en/pricing> (a commercial key changes the hostname to `customer-api.open-meteo.com`, which would be a separate connection)."
+  },
+  "env": "prod",
+  "account_label": "",
+  "data_categories": ["none"],
+  "base_url": "https://api.open-meteo.com",
+  "network_allowlist": ["api.open-meteo.com", "geocoding-api.open-meteo.com"],
+  "health": "geocode",
+  "timeout_ms": 30000,
+  "max_response_bytes": 262144,
+  "limits": { "per_minute": 60 },
+  "operations": [
+    {
+      "id": "geocode",
+      "summary": "Resolve a place name to latitude/longitude coordinates",
+      "description": "Searches Open-Meteo's geocoding database for places matching a name and returns candidates with latitude, longitude, country, admin region, timezone, and population. Use this FIRST whenever the user names a place rather than giving coordinates — forecast and current-weather both require lat/lon. Read-only, no side effects. NOTE: this operation lives on a different host than base_url; its path is an absolute URL (geocoding-api.open-meteo.com, allowlisted above).",
+      "method": "GET",
+      "path": "https://geocoding-api.open-meteo.com/v1/search",
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Place name to search for, e.g. \"Birmingham\". Fuzzy matching applies for 3+ characters; 1-2 characters require an exact match."
+          },
+          "count": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of candidate places to return."
+          },
+          "language": {
+            "type": "string",
+            "default": "en",
+            "description": "Lowercase ISO-639-1 language code for localized place names, e.g. \"en\", \"de\"."
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "Optional uppercase ISO-3166-1 alpha-2 filter, e.g. \"US\" — restricts results to one country. Useful to disambiguate names that exist in many countries."
+          }
+        },
+        "required": ["name"]
+      },
+      "safe": true,
+      "example_args": { "name": "Birmingham", "count": 3, "language": "en", "countryCode": "US" }
+    },
+    {
+      "id": "forecast",
+      "summary": "Get hourly and/or daily weather forecast for coordinates",
+      "description": "Returns a multi-day forecast for a lat/lon point: hourly time-series and/or daily aggregates, each variable selected by name. Use this for anything about the future or about time-series detail (rain tomorrow, temperatures this week). For a one-shot \"what is it like right now\", prefer current-weather — smaller response, no variable-list thinking. Read-only, no side effects. Returns parallel arrays under hourly.time / hourly.<variable> and daily.time / daily.<variable>, plus per-variable units.",
+      "method": "GET",
+      "path": "/v1/forecast",
+      "params": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "description": "WGS84 latitude in decimal degrees, e.g. 33.52 for Birmingham, AL."
+          },
+          "longitude": {
+            "type": "number",
+            "description": "WGS84 longitude in decimal degrees, e.g. -86.81 for Birmingham, AL."
+          },
+          "hourly": {
+            "type": "string",
+            "description": "Comma-separated hourly variable names, e.g. \"temperature_2m\", \"temperature_2m,precipitation,wind_speed_10m\". Common values: temperature_2m, relative_humidity_2m, precipitation, precipitation_probability, wind_speed_10m, cloud_cover, weather_code. Omit to skip hourly data."
+          },
+          "daily": {
+            "type": "string",
+            "description": "Comma-separated daily aggregate names, e.g. \"temperature_2m_max,temperature_2m_min,precipitation_sum\". Common values: temperature_2m_max, temperature_2m_min, precipitation_sum, precipitation_probability_max, sunrise, sunset, weather_code, wind_speed_10m_max. Requires timezone to be set. Omit to skip daily data."
+          },
+          "forecast_days": {
+            "type": "integer",
+            "default": 7,
+            "minimum": 1,
+            "maximum": 16,
+            "description": "Number of forecast days to return. Keep small (1-3) to keep responses compact."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone for local-time timestamps, e.g. \"America/Chicago\", or \"auto\" to resolve from the coordinates. Default is GMT. Required when requesting daily aggregates."
+          }
+        },
+        "required": ["latitude", "longitude"]
+      },
+      "safe": true,
+      "example_args": {
+        "latitude": 33.52,
+        "longitude": -86.81,
+        "hourly": "temperature_2m",
+        "daily": "temperature_2m_max,precipitation_sum",
+        "forecast_days": 3,
+        "timezone": "America/Chicago"
+      }
+    },
+    {
+      "id": "current-weather",
+      "summary": "Get current conditions (temperature, wind) for coordinates",
+      "description": "Convenience wrapper over the same /v1/forecast endpoint that returns ONLY a compact `current` block for a lat/lon point — one timestamped reading per requested variable, no time-series arrays. Prefer this over forecast when the question is about right now; use forecast when the user asks about later today, tomorrow, or trends. Read-only, no side effects.",
+      "method": "GET",
+      "path": "/v1/forecast",
+      "params": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "description": "WGS84 latitude in decimal degrees, e.g. 33.52 for Birmingham, AL."
+          },
+          "longitude": {
+            "type": "number",
+            "description": "WGS84 longitude in decimal degrees, e.g. -86.81 for Birmingham, AL."
+          },
+          "current": {
+            "type": "string",
+            "default": "temperature_2m,wind_speed_10m",
+            "description": "Comma-separated current-condition variable names. The default covers temperature and wind; other common values: relative_humidity_2m, apparent_temperature, precipitation, weather_code, cloud_cover."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone for the reading's local timestamp, e.g. \"America/Chicago\", or \"auto\". Default is GMT."
+          }
+        },
+        "required": ["latitude", "longitude"]
+      },
+      "safe": true,
+      "example_args": {
+        "latitude": 33.52,
+        "longitude": -86.81,
+        "current": "temperature_2m,wind_speed_10m",
+        "timezone": "America/Chicago"
+      }
+    }
+  ]
+}
