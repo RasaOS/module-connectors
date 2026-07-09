@@ -1,5 +1,8 @@
 # CLAUDE.md — `rasa.module.connectors`
 
+> **Who you are (SA-025).** `rasa.module.connectors` — the RasaOS module for connectors and integrations. Substrate: **RasaOS**; role: **module**. On install `bin/init` renders this into `.claude/rasa-identity.md`; `/whoami` composes the full identity with the project's deployment layer.
+
+
 You are working inside **`rasa.module.connectors`** — the first-party
 reference connector pack of the RasaOS Connections track. Canon-shaped
 `module` Element, contract 1.3.0.
